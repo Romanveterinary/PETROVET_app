@@ -1,68 +1,81 @@
 import flet as ft
 import google.generativeai as genai
-import os
 
-# Твій безкоштовний ключ
-DEFAULT_API_KEY = "AIzaSyCoi5-6zcMFWW6aB5Gul6dPm5i1frn_EFI"
+# ВСТАВ СВІЙ БЕЗКОШТОВНИЙ КЛЮЧ ТУТ
+MY_API_KEY = "ВСТАВ_ТВІЙ_КЛЮЧ"
 
 def main(page: ft.Page):
-    # Налаштування сторінки
-    page.title = "PETROVET"
+    page.title = "PETROVET 49.0"
     page.theme_mode = ft.ThemeMode.DARK
-    page.vertical_alignment = ft.MainAxisAlignment.START
-    
-    # Створюємо текстове поле для виводу ВІДРАЗУ
-    log_text = ft.Text("Ініціалізація системи...", color="yellow")
-    page.add(log_text)
-    
+    page.scroll = ft.ScrollMode.AUTO
+    page.padding = 20
+
+    # Налаштування моделі Gemini 2.5 Flash
     try:
-        # Спроба налаштувати ШІ
-        genai.configure(api_key=DEFAULT_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        log_text.value = "✅ Система готова. Наказ №16, 46, 28 завантажено."
-        log_text.color = "green"
-    except Exception as e:
-        log_text.value = f"❌ Помилка конфігурації: {str(e)}"
-        log_text.color = "red"
-    
-    # Головний заголовок
-    page.add(ft.Text("🛡️ ПЕТРОВЕТ v51.0", size=28, weight="bold"))
-    
-    # Поле результату
-    result_area = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
-    result_text = ft.Text("Оберіть дію або напишіть питання.", size=16)
-    result_area.controls.append(result_text)
+        genai.configure(api_key=MY_API_KEY)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+    except:
+        model = None
 
-    def on_ask_click(e):
-        user_q = user_input.value
-        if not user_q: return
+    # БАЗА ЗНАНЬ (Твої 11 законів)
+    LAW_BASE = """
+    Ти — професійний ветеринарний інспектор-аналітик України. 
+    Твої відповіді базуються ВИКЛЮЧНО на цих нормах:
+    1. Наказ №16 (Вет-сан експертиза на ринках).
+    2. Наказ №46 (М'ясо, клеймування, огляд туш та голів).
+    3. Наказ №28 (Молоко та молочні продукти, заборона ПЕТ-тари).
+    4. Наказ №57 (Риба та рибопродукти).
+    5. Наказ №1032 (Протоколи, акти та документація).
+    6. Закон №1870-IV (Про ветеринарну медицину).
+    7. Закон №771 (Про безпечність та якість харчових продуктів).
+    8. КУпАП статті 107 та 160 (Штрафи, стихійна торгівля).
+    9. Наказ №23 (Правила реалізації живої риби на ринках).
+    10. ДСТУ (Правила відбору проб для експертизи).
+    11. Ветеринарно-санітарні вимоги ЄС (для порівняння).
+    """
+
+    header = ft.Text("🛡️ ПЕТРОВЕТ: Ветеринарний Контроль", size=26, weight="bold", color="blue400")
+    output = ft.Markdown(value="Система готова. Оберіть категорію перевірки:", selectable=True)
+
+    def ask_ai(user_question):
+        if not model:
+            output.value = "❌ Помилка: Ключ не знайдено або модель недоступна."
+            page.update()
+            return
         
-        result_text.value = "⏳ Запит до бази законодавства..."
+        output.value = "⏳ Аналізую законодавчу базу (Накази №16, 46, 28...)..."
         page.update()
+        
         try:
-            response = model.generate_content(f"Ти ветеринарний інспектор. Дай коротку відповідь на питання: {user_q}")
-            result_text.value = response.text
-        except Exception as ex:
-            result_text.value = f"Помилка ШІ: {str(ex)}"
+            full_prompt = f"{LAW_BASE}\n\nПИТАННЯ: {user_question}\n\nВідповідай професійно, з посиланням на статтю або пункт Наказу."
+            response = model.generate_content(full_prompt)
+            output.value = response.text
+        except Exception as e:
+            output.value = f"❌ Помилка запиту: {str(e)}"
         page.update()
 
-    # Інтерфейс
-    user_input = ft.TextField(label="Питання (напр. Наказ 46)", expand=True)
-    ask_button = ft.ElevatedButton("Спитати ШІ", on_click=on_ask_click)
-    
-    page.add(
-        ft.Row([user_input, ask_button]),
-        ft.Container(
-            content=result_area,
-            padding=10,
-            border=ft.border.all(1, "grey400"),
-            border_radius=10,
-            height=300
-        )
-    )
-    page.update()
+    # Кнопки швидкого доступу до бази
+    btns = ft.Column([
+        ft.Row([
+            ft.ElevatedButton("М'ясо (Наказ 46)", on_click=lambda _: ask_ai("Які вимоги до клеймування м'яса та огляду голів?"), expand=True),
+            ft.ElevatedButton("Молоко (Наказ 28)", on_click=lambda _: ask_ai("Чи дозволена ПЕТ-тара та які норми чистоти молока?"), expand=True),
+        ]),
+        ft.Row([
+            ft.ElevatedButton("Риба (Наказ 23)", on_click=lambda _: ask_ai("Які правила реалізації живої риби на ринках?"), expand=True),
+            ft.ElevatedButton("Штрафи (КУпАП)", on_click=lambda _: ask_ai("Які штрафи за статтями 107 та 160 КУпАП?"), expand=True),
+        ])
+    ])
 
-# Важливо для мобільної версії
+    user_input = ft.TextField(label="Напишіть своє питання інспектору...", expand=True)
+    send_btn = ft.FloatingActionButton(icon=ft.icons.SEND, on_click=lambda _: ask_ai(user_input.value))
+
+    page.add(
+        header,
+        ft.Divider(),
+        btns,
+        ft.Container(output, padding=10, border=ft.border.all(1, "grey"), border_radius=10, bgcolor=ft.colors.BLACK12),
+        ft.Row([user_input, send_btn])
+    )
+
 if __name__ == "__main__":
     ft.app(target=main)
-
