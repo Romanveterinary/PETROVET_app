@@ -3,7 +3,7 @@ import google.generativeai as genai
 import os
 
 # Твій безкоштовний ключ
-DEFAULT_API_KEY = "ВСТАВ_ТУТ_БЕЗКОШТОВНИЙ_КЛЮЧ"
+DEFAULT_API_KEY = "AIzaSyCoi5-6zcMFWW6aB5Gul6dPm5i1frn_EFI"
 
 def main(page: ft.Page):
     # Налаштування сторінки
@@ -65,3 +65,4 @@ def main(page: ft.Page):
 # Важливо для мобільної версії
 if __name__ == "__main__":
     ft.app(target=main)
+
