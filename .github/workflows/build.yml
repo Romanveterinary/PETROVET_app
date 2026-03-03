@@ -23,12 +23,15 @@ jobs:
       - name: Install Flet
         run: pip install flet
 
-      - name: Build APK
+      - name: Fix Path and Build
         run: |
-          # Ця команда знайде файл, де б він не був, і запустить збірку
-          FILE_PATH=$(find . -name "main.py" -print -quit)
-          echo "Found main.py at: $FILE_PATH"
-          flet build apk "$FILE_PATH"
+          # Знаходимо main.py і копіюємо його в корінь, якщо він не там
+          TARGET_FILE=$(find . -name "main.py" -print -quit)
+          if [ "$TARGET_FILE" != "./main.py" ]; then
+            cp "$TARGET_FILE" ./main.py
+          fi
+          # Запускаємо збірку з кореня
+          flet build apk main.py
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
