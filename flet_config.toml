@@ -1,0 +1,2 @@
+[package]
+include_files = ["main.py"]
