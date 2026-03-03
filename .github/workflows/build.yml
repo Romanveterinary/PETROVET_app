@@ -22,11 +22,12 @@ jobs:
 
       - name: Build APK
         run: |
-          # Виводимо список файлів, щоб ти бачив їх у логах
-          ls -R
-          # Спроба збірки
-          flet build apk main.py
-
+          # Вказуємо шлях до SDK та приймаємо ліцензії
+          yes | flutter doctor --android-licenses
+          
+          # Запускаємо збірку з явним вказанням модуля
+          flet build apk --module-name main
+          
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
