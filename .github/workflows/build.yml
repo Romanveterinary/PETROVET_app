@@ -1,6 +1,6 @@
 name: Build PETROVET APK
 on: 
-  workflow_dispatch: # Дозволяє запускати збірку вручну
+  workflow_dispatch:
   push:
     branches: [ "main" ]
 
@@ -24,7 +24,11 @@ jobs:
         run: pip install flet
 
       - name: Build APK
-        run: flet build apk main.py
+        run: |
+          # Ця команда знайде файл, де б він не був, і запустить збірку
+          FILE_PATH=$(find . -name "main.py" -print -quit)
+          echo "Found main.py at: $FILE_PATH"
+          flet build apk "$FILE_PATH"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
