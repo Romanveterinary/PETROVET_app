@@ -21,37 +21,31 @@ jobs:
           echo 'name = "petrovetapp"' >> flet.toml
           echo 'description = "vet inspector"' >> flet.toml
 
-      - name: Встановлення бібліотек Linux (Для 100% зеленого Flutter Doctor)
+      - name: Встановлення бібліотек Linux (Для успішного тесту системи)
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev mesa-utils
 
-      - name: Налаштування Java (Для Android)
+      - name: Налаштування Java 17 (Для Android)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Налаштування офіційного Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Авто-прийняття ліцензій Android
-        run: yes | flutter doctor --android-licenses
-
-      - name: Налаштування Python
+      - name: Налаштування Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Встановлення Flet
+      - name: Глобальне оновлення модулів (Вбиваємо баг Unicode)
         run: |
           python -m pip install --upgrade pip
+          pip install --upgrade requests urllib3 chardet charset-normalizer
           pip install flet
 
-      - name: Збірка Android додатку (З автозгодою та UTF-8)
+      - name: Збірка Android додатку (Примусовий UTF-8 + Автозгода)
         env:
+          PYTHONIOENCODING: "utf-8"
           PYTHONUTF8: "1"
         run: yes | flet build apk
 
