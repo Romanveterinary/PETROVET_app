@@ -7,56 +7,34 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Завантаження коду
         uses: actions/checkout@v4
-
-      - name: Очищення конфліктних файлів
-        run: |
-          rm -f README.md requirements.txt flet_config.toml
-          echo '[app]' > flet.toml
-          echo 'id = "com.petrovet.app"' >> flet.toml
-          echo 'name = "petrovetapp"' >> flet.toml
-          echo 'description = "vet inspector"' >> flet.toml
-
-      - name: Встановлення бібліотек Linux
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev mesa-utils
-
-      - name: Налаштування Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Налаштування Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Авто-прийняття ліцензій Android
-        run: yes | flutter doctor --android-licenses
 
       - name: Налаштування Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      - name: Блокування багу (Створюємо файл вимог вручну)
+        run: |
+          rm -f README.md flet_config.toml requirements.txt
+          echo "flet" > requirements.txt
+          echo "[app]" > flet.toml
+          echo "id = \"com.petrovet.app\"" >> flet.toml
+          echo "name = \"petrovetapp\"" >> flet.toml
+          echo "description = \"vet inspector\"" >> flet.toml
+
       - name: Встановлення Flet
         run: |
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: Збірка додатку
-        env:
-          PYTHONUTF8: "1"
-          LANG: "C.UTF-8"
-          LC_ALL: "C.UTF-8"
+      - name: Збірка Android додатку
         run: flet build apk
 
-      - name: Збереження готового APK
+      - name: Збереження готового файлу APK
         uses: actions/upload-artifact@v4
         with:
           name: VET-INSPECTOR-APP
