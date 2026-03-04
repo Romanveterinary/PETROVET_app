@@ -1,35 +1,32 @@
-name: Build PETROVET APK
-on: [push, workflow_dispatch]
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "master" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          
-      - name: Setup Python
+      - name: Завантаження коду
+        uses: actions/checkout@v4
+
+      - name: Налаштування Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Flet
-        run: pip install flet
-
-      - name: Build APK
+      - name: Встановлення чистих інструментів
         run: |
-          # Вказуємо шлях до SDK та приймаємо ліцензії
-          yes | flutter doctor --android-licenses
-          
-          # Запускаємо збірку з явним вказанням модуля
-          flet build apk --module-name main
-          
-      - name: Upload APK
+          python -m pip install --upgrade pip
+          pip install flet
+
+      - name: Жорстка збірка додатку (Без кирилиці для сервера)
+        run: flet build apk --project-name petrovetapp --description "vetinspector" --org "com.petrovet"
+
+      - name: Збереження готового APK
         uses: actions/upload-artifact@v4
         with:
-          name: petrovet-app-package
-          path: build/apk/*.apk
+          name: VET-INSPECTOR-APP
+          path: build/apk/**/*.apk
