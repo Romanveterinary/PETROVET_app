@@ -2,20 +2,20 @@ import flet as ft
 import traceback
 
 def main(page: ft.Page):
+    # Одразу малюємо екран, щоб він не був білим!
     page.title = "VET-INSPECTOR AUDIT PRO"
     page.padding = 15 
     page.scroll = ft.ScrollMode.AUTO
     page.theme_mode = ft.ThemeMode.LIGHT
     
     try:
-        # --- ПАСТКА ДЛЯ ПОМИЛОК ---
-        # Імпортуємо бібліотеки тут. Якщо Android їх заблокує, ми побачимо чому!
-        import google.generativeai as genai
-        import PIL.Image
+        # 🚨 СУПЕР-ПАСТКА: ТЕПЕР УСІ ІМПОРТИ ТУТ 🚨
+        import requests
+        import base64
+        import json
         import os
         import datetime
-        import base64
-        
+
         # 1. ВСТАВТЕ СЮДИ ВАШ БАЗОВИЙ API КЛЮЧ
         DEFAULT_API_KEY = "AIzaSyCoi5-6zcMFWW6aB5Gul6dPm5i1frn_EFI"
 
@@ -26,9 +26,7 @@ def main(page: ft.Page):
         База знань: Накази №16, №46, №28, №57, №1032, Закони №1870-IV, №771, КУпАП (ст. 107, 160).
         ПРАВИЛО ПРІОРИТЕТУ: Якщо людина-інспектор передає коментар "Недоліків немає" або подібний, 
         ти ПОВИНЕН погодитися з ним, встановити ЗЕЛЕНИЙ рівень ризику і не шукати порушень.
-        ОБОВ'ЯЗКОВИЙ АНАЛІЗ: 
-        Завжди оцінюй гігієну продавців, стан місця для продажу, чистоту поверхонь, стан ножів/інвентарю та наявність рукавичок. 
-        Описуй порушення по пунктах із суворим посиланням на відповідне законодавство.
+        ОБОВ'ЯЗКОВИЙ АНАЛІЗ: Завжди оцінюй гігієну продавців, стан місця для продажу, чистоту поверхонь, стан ножів/інвентарю та наявність рукавичок.
         """
 
         selected_image_paths = []
@@ -37,7 +35,6 @@ def main(page: ft.Page):
         
         def save_api_key(e):
             page.client_storage.set("GEMINI_API_KEY", api_key_input.value)
-            genai.configure(api_key=api_key_input.value)
             settings_dialog.open = False
             page.snack_bar = ft.SnackBar(ft.Text("✅ Новий API Ключ збережено!"), bgcolor=ft.colors.GREEN)
             page.snack_bar.open = True
@@ -59,12 +56,6 @@ def main(page: ft.Page):
                 api_key_input.value = saved_key
             settings_dialog.open = True
             page.update()
-
-        saved_api_key = page.client_storage.get("GEMINI_API_KEY")
-        if saved_api_key:
-            genai.configure(api_key=saved_api_key)
-        else:
-            genai.configure(api_key=DEFAULT_API_KEY)
 
         title_row = ft.Row([
             ft.Text("VET-INSPECTOR PRO", size=18, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_900, expand=True),
@@ -124,33 +115,56 @@ def main(page: ft.Page):
             page.update()
 
             try:
-                model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=system_instruction)
-                pil_images = [PIL.Image.open(path) for path in selected_image_paths]
-                
-                prompt = f"Проаналізуй усі надані фото в комплексі.\nОб'єкт: {object_dropdown.value}\nТемпература: {temp_input.value} °C\nВИСНОВОК ІНСПЕКТОРА: {inspector_comment.value}\n1. Визнач рівень ризику: [РИЗИК_ЗЕЛЕНИЙ], [РИЗИК_ЖОВТИЙ] або [РИЗИК_ЧЕРВОНИЙ].\n2. Опиши порушення.\n3. Зазнач штрафи та дії."
-                
-                response = model.generate_content([prompt] + pil_images)
-                result_text = response.text
-                
-                if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
-                    risk_indicator.bgcolor = ft.colors.GREEN
-                    risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
-                elif "[РИЗИК_ЖОВТИЙ]" in result_text:
-                    risk_indicator.bgcolor = ft.colors.YELLOW_800
-                    risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
-                elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
-                    risk_indicator.bgcolor = ft.colors.RED
-                    risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
+                current_key = page.client_storage.get("GEMINI_API_KEY")
+                if not current_key:
+                    current_key = DEFAULT_API_KEY
 
-                result_text = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "")
-                ai_response_text.value = result_text.strip()
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={current_key}"
+                
+                prompt = f"Проаналізуй усі надані фото в комплексі.\nДані від інспектора:\n- Об'єкт: {object_dropdown.value}\n- Температура: {temp_input.value} °C\n- ВИСНОВОК ІНСПЕКТОРА: {inspector_comment.value}\n\nТвоє завдання:\n1. Визнач рівень ризику тегом: [РИЗИК_ЗЕЛЕНИЙ], [РИЗИК_ЖОВТИЙ] або [РИЗИК_ЧЕРВОНИЙ].\n2. Опиши виявлені порушення з посиланням на пункти законодавства.\n3. Зазнач можливі штрафи та алгоритм дій."
+
+                parts = [{"text": prompt}]
+                for path in selected_image_paths:
+                    with open(path, "rb") as img_file:
+                        b64_data = base64.b64encode(img_file.read()).decode("utf-8")
+                        parts.append({
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": b64_data
+                            }
+                        })
+
+                payload = {
+                    "system_instruction": {"parts": [{"text": system_instruction}]},
+                    "contents": [{"parts": parts}]
+                }
+
+                headers = {"Content-Type": "application/json"}
+                response = requests.post(url, headers=headers, json=payload)
+                
+                if response.status_code == 200:
+                    result_data = response.json()
+                    result_text = result_data["candidates"][0]["content"]["parts"][0]["text"]
+                    
+                    if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
+                        risk_indicator.bgcolor = ft.colors.GREEN
+                        risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
+                    elif "[РИЗИК_ЖОВТИЙ]" in result_text:
+                        risk_indicator.bgcolor = ft.colors.YELLOW_800
+                        risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
+                    elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
+                        risk_indicator.bgcolor = ft.colors.RED
+                        risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
+
+                    result_text = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "")
+                    ai_response_text.value = result_text.strip()
+                else:
+                    ai_response_text.value = f"❌ Помилка сервера. Код: {response.status_code}"
+                
                 page.update()
                 
             except Exception as ex:
-                if "API_KEY_INVALID" in str(ex) or "403" in str(ex) or "400" in str(ex):
-                     ai_response_text.value = "❌ Помилка API Ключа. Можливо він заблокований або недійсний. Вставте новий ключ у Налаштуваннях (⚙️)."
-                else:
-                     ai_response_text.value = f"❌ Помилка аналізу: {str(ex)}"
+                ai_response_text.value = f"❌ Системна помилка інтернету: {str(ex)}"
                 page.update()
 
         def generate_act(e):
@@ -161,9 +175,9 @@ def main(page: ft.Page):
             filename = f"AKT_{current_time}.html"
             
             try:
-                save_dir = os.path.expanduser("~/Documents")
+                save_dir = "/storage/emulated/0/Download"
                 if not os.path.exists(save_dir):
-                    save_dir = os.path.expanduser("~")
+                    save_dir = os.getcwd()
             except:
                 save_dir = os.getcwd()
                 
@@ -178,14 +192,14 @@ def main(page: ft.Page):
                 except:
                     pass
 
-            html_content = f"<html><body><h1>АКТ ВЕТЕРИНАРНО-САНІТАРНОГО ОБСТЕЖЕННЯ</h1><p><b>Дата:</b> {current_time}</p><p><b>Об'єкт:</b> {object_dropdown.value}</p><div>{images_html}</div><pre>{ai_response_text.value}</pre></body></html>"
+            html_content = f"<html><body><h1>АКТ ОБСТЕЖЕННЯ</h1><p><b>Дата:</b> {current_time}</p><div>{images_html}</div><pre>{ai_response_text.value}</pre></body></html>"
             
             try:
                 with open(filepath, "w", encoding="utf-8") as file:
                     file.write(html_content)
-                ai_response_text.value += f"\n\n---\n**✅ АКТ ЗБЕРЕЖЕНО!**\nФайл: `{filepath}`"
+                ai_response_text.value += f"\n\n---\n**✅ АКТ ЗБЕРЕЖЕНО В ПАПКУ DOWNLOADS!**"
             except Exception as ex:
-                ai_response_text.value += f"\n\n---\n**❌ Помилка збереження акту:** {ex}"
+                ai_response_text.value += f"\n\n---\n**❌ Помилка збереження:** {ex}"
                 
             page.update()
 
@@ -200,12 +214,11 @@ def main(page: ft.Page):
             risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО"
             page.update()
 
+        # Малюємо всі елементи на екрані
         page.add(
             ft.Column([
                 title_row,
-                ft.Row([
-                    ft.ElevatedButton("📷 ДОДАТИ ФОТО", icon=ft.icons.CAMERA_ALT, on_click=lambda _: file_picker.pick_files(allow_multiple=True), expand=True),
-                ]),
+                ft.Row([ft.ElevatedButton("📷 ДОДАТИ ФОТО", icon=ft.icons.CAMERA_ALT, on_click=lambda _: file_picker.pick_files(allow_multiple=True), expand=True)]),
                 images_row,
                 object_dropdown,
                 inputs_row,
@@ -214,19 +227,18 @@ def main(page: ft.Page):
                 ft.Divider(),
                 ai_response_text,
                 ft.Divider(),
-                ft.Row([
-                     ft.ElevatedButton("🔄 НОВЕ ОБСТЕЖЕННЯ", icon=ft.icons.REFRESH, on_click=reset_form, color=ft.colors.RED_700, expand=True),
-                ]),
+                ft.Row([ft.ElevatedButton("🔄 НОВЕ ОБСТЕЖЕННЯ", icon=ft.icons.REFRESH, on_click=reset_form, color=ft.colors.RED_700, expand=True)]),
                 ft.ElevatedButton("📄 СКЛАСТИ АКТ", icon=ft.icons.SAVE, on_click=generate_act, bgcolor=ft.colors.GREEN_700, color=ft.colors.WHITE)
             ], horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
         )
 
     except Exception as critical_error:
-        # ЦЕЙ БЛОК ПІЙМАЄ ПОМИЛКУ "БІЛОГО ЕКРАНУ"!
+        # 🚨 ЯКЩО ЩОСЬ ПІШЛО НЕ ТАК, ЕКРАН БУДЕ ЧЕРВОНИМ ІЗ ТЕКСТОМ ПОМИЛКИ!
         page.add(
-            ft.Text("🚨 КРИТИЧНА ПОМИЛКА ПРИ ЗАПУСКУ!", color=ft.colors.RED, size=20, weight=ft.FontWeight.BOLD),
-            ft.Text("Сфотографуйте цей текст і покажіть розробнику:", color=ft.colors.BLACK),
-            ft.TextField(value=traceback.format_exc(), multiline=True, read_only=True, min_lines=15, text_size=12, color=ft.colors.RED_900)
+            ft.Text("🚨 ПОМИЛКА ПРИ ЗАПУСКУ ДОДАТКА", color=ft.colors.RED, size=20, weight=ft.FontWeight.BOLD),
+            ft.Text("Зробіть скріншот цього екрана:", color=ft.colors.BLACK),
+            ft.TextField(value=traceback.format_exc(), multiline=True, read_only=True, color=ft.colors.RED_900, text_size=12, min_lines=20)
         )
+        page.update()
 
 ft.app(target=main)
