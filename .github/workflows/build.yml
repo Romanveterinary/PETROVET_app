@@ -12,25 +12,29 @@ jobs:
       - name: Завантаження коду
         uses: actions/checkout@v4
 
+      - name: Налаштування Java (Для Android)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Налаштування офіційного Flutter (З ліцензіями)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
       - name: Налаштування Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Встановлення інструментів
+      - name: Встановлення СТАБІЛЬНОЇ версії Flet
         run: |
           python -m pip install --upgrade pip
-          pip install flet
+          pip install flet==0.25.2
 
-      - name: Створення безпечного файлу налаштувань
-        run: |
-          echo '[app]' > flet.toml
-          echo 'id = "com.petrovet.app"' >> flet.toml
-          echo 'name = "petrovetapp"' >> flet.toml
-          echo 'description = "vet inspector"' >> flet.toml
-
-      - name: Збірка додатку (З автоматичною згодою)
-        run: yes | flet build apk
+      - name: Збірка додатку
+        run: flet build apk
 
       - name: Збереження готового APK
         uses: actions/upload-artifact@v4
