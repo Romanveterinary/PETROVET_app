@@ -2,15 +2,15 @@ import flet as ft
 import traceback
 
 def main(page: ft.Page):
-    # Одразу малюємо екран, щоб він не був білим!
     page.title = "VET-INSPECTOR AUDIT PRO"
     page.padding = 15 
     page.scroll = ft.ScrollMode.AUTO
     page.theme_mode = ft.ThemeMode.LIGHT
     
     try:
-        # 🚨 СУПЕР-ПАСТКА: ТЕПЕР УСІ ІМПОРТИ ТУТ 🚨
-        import requests
+        # 🚨 Використовуємо лише ВБУДОВАНІ, надійні бібліотеки Python 🚨
+        import urllib.request
+        import urllib.error
         import base64
         import json
         import os
@@ -139,32 +139,34 @@ def main(page: ft.Page):
                     "contents": [{"parts": parts}]
                 }
 
-                headers = {"Content-Type": "application/json"}
-                response = requests.post(url, headers=headers, json=payload)
+                # Робимо рідний запит Python (без requests)
+                data = json.dumps(payload).encode('utf-8')
+                req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
                 
-                if response.status_code == 200:
-                    result_data = response.json()
-                    result_text = result_data["candidates"][0]["content"]["parts"][0]["text"]
-                    
-                    if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
-                        risk_indicator.bgcolor = ft.colors.GREEN
-                        risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
-                    elif "[РИЗИК_ЖОВТИЙ]" in result_text:
-                        risk_indicator.bgcolor = ft.colors.YELLOW_800
-                        risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
-                    elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
-                        risk_indicator.bgcolor = ft.colors.RED
-                        risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
+                try:
+                    with urllib.request.urlopen(req) as response:
+                        result_data = json.loads(response.read().decode('utf-8'))
+                        result_text = result_data["candidates"][0]["content"]["parts"][0]["text"]
+                        
+                        if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
+                            risk_indicator.bgcolor = ft.colors.GREEN
+                            risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
+                        elif "[РИЗИК_ЖОВТИЙ]" in result_text:
+                            risk_indicator.bgcolor = ft.colors.YELLOW_800
+                            risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
+                        elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
+                            risk_indicator.bgcolor = ft.colors.RED
+                            risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
 
-                    result_text = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "")
-                    ai_response_text.value = result_text.strip()
-                else:
-                    ai_response_text.value = f"❌ Помилка сервера. Код: {response.status_code}"
-                
+                        result_text = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "")
+                        ai_response_text.value = result_text.strip()
+                except urllib.error.HTTPError as http_err:
+                     ai_response_text.value = f"❌ Помилка API або сервера (Код: {http_err.code}). Перевірте ключ у Налаштуваннях (⚙️)."
+                     
                 page.update()
                 
             except Exception as ex:
-                ai_response_text.value = f"❌ Системна помилка інтернету: {str(ex)}"
+                ai_response_text.value = f"❌ Системна помилка: {str(ex)}"
                 page.update()
 
         def generate_act(e):
@@ -214,7 +216,6 @@ def main(page: ft.Page):
             risk_indicator.content.value = "РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО"
             page.update()
 
-        # Малюємо всі елементи на екрані
         page.add(
             ft.Column([
                 title_row,
@@ -233,10 +234,8 @@ def main(page: ft.Page):
         )
 
     except Exception as critical_error:
-        # 🚨 ЯКЩО ЩОСЬ ПІШЛО НЕ ТАК, ЕКРАН БУДЕ ЧЕРВОНИМ ІЗ ТЕКСТОМ ПОМИЛКИ!
         page.add(
             ft.Text("🚨 ПОМИЛКА ПРИ ЗАПУСКУ ДОДАТКА", color=ft.colors.RED, size=20, weight=ft.FontWeight.BOLD),
-            ft.Text("Зробіть скріншот цього екрана:", color=ft.colors.BLACK),
             ft.TextField(value=traceback.format_exc(), multiline=True, read_only=True, color=ft.colors.RED_900, text_size=12, min_lines=20)
         )
         page.update()
