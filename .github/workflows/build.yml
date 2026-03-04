@@ -22,15 +22,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: Створення безпечного файлу налаштувань (Анти-кирилиця)
+      - name: Створення безпечного файлу налаштувань
         run: |
           echo '[app]' > flet.toml
           echo 'id = "com.petrovet.app"' >> flet.toml
           echo 'name = "petrovetapp"' >> flet.toml
           echo 'description = "vet inspector"' >> flet.toml
 
-      - name: Збірка додатку
-        run: flet build apk
+      - name: Збірка додатку (З автоматичною згодою)
+        run: yes | flet build apk
 
       - name: Збереження готового APK
         uses: actions/upload-artifact@v4
