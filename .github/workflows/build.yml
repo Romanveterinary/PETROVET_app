@@ -22,17 +22,17 @@ jobs:
           rm -f README.md flet_config.toml requirements.txt
           echo "flet" > requirements.txt
           echo "[app]" > flet.toml
-          echo "id = \"com.petrovet.app\"" >> flet.toml
-          echo "name = \"petrovetapp\"" >> flet.toml
-          echo "description = \"vet inspector\"" >> flet.toml
+          echo 'id = "com.petrovet.app"' >> flet.toml
+          echo 'name = "petrovetapp"' >> flet.toml
+          echo 'description = "vet inspector"' >> flet.toml
 
       - name: Встановлення Flet
         run: |
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: Збірка Android додатку
-        run: flet build apk
+      - name: Збірка Android додатку (З автоматичною згодою)
+        run: yes | flet build apk
 
       - name: Збереження готового файлу APK
         uses: actions/upload-artifact@v4
