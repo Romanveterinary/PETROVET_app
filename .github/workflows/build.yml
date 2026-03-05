@@ -8,72 +8,38 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
       - name: Завантаження коду
         uses: actions/checkout@v4
 
-      - name: Очищення конфліктних файлів
+      - name: Налаштування Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Налаштування СТАБІЛЬНОГО Flutter (З вашого робочого проекту)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.3'
+          channel: 'stable'
+
+      - name: Встановлення СТАБІЛЬНОГО Flet
+        run: pip install flet==0.28.3
+
+      - name: Підготовка конфігурації (Без багів)
         run: |
-          rm -f README.md flet_config.toml requirements.txt
-          echo "flet" > requirements.txt
+          rm -f requirements.txt flet.toml flet_config.toml
+          echo "flet==0.28.3" > requirements.txt
           echo "[app]" > flet.toml
           echo 'id = "com.petrovet.app"' >> flet.toml
           echo 'name = "petrovetapp"' >> flet.toml
           echo 'description = "vet inspector"' >> flet.toml
 
-      - name: Встановлення бібліотек Linux (Для чистого звіту)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev mesa-utils
+      - name: Збірка APK
+        run: flet build apk
 
-      - name: Налаштування Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Налаштування ТОЧНОЇ версії Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.41.2'
-          channel: 'stable'
-
-      - name: Авто-прийняття ліцензій Android
-        run: yes | flutter doctor --android-licenses
-
-      - name: Налаштування Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Вбивця Багів (Глобальний системний патч ядра Python)
-        run: |
-          cat << 'EOF' > patch.py
-          import site, os
-          path = os.path.join(site.getsitepackages()[0], 'sitecustomize.py')
-          with open(path, 'w') as f:
-              f.write("import builtins\n")
-              f.write("import sys\n")
-              f.write("builtins.unicode = str\n")
-              f.write("if sys.stdin and getattr(sys.stdin, 'encoding', None) is None:\n")
-              f.write("    try: sys.stdin.reconfigure(encoding='utf-8')\n")
-              f.write("    except: pass\n")
-          EOF
-          python patch.py
-
-      - name: Оновлення модулів та встановлення Flet
-        run: |
-          python -m pip install --upgrade pip
-          pip install urllib3==1.26.18 requests==2.31.0 chardet==5.2.0 charset-normalizer==3.3.2
-          pip install flet
-
-      - name: Збірка Android додатку (Абсолютний запуск)
-        env:
-          PYTHONIOENCODING: "utf-8"
-          PYTHONUTF8: "1"
-        run: yes | flet build apk
-
-      - name: Збереження готового файлу APK
+      - name: Збереження готового додатку
         uses: actions/upload-artifact@v4
         with:
           name: VET-INSPECTOR-APP
