@@ -4,24 +4,19 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 25 # Авто-скасування при зависанні
+    timeout-minutes: 25 # Якщо за 25 хв не зібралося — скасовуємо автоматично
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3' # Фіксована версія
+          flutter-version: '3.24.3' # Суворо дотримуємось лімітів
           channel: 'stable'
 
-      - name: Pre-accept Android Licenses
-        # Вирішує проблему "Some Android licenses not accepted"
+      - name: Force Accept Android Licenses
+        # Це найважливіше — кажемо "так" на всі ліцензії заздалегідь
         run: |
           yes | sdkmanager --licenses || true
           flutter doctor --android-licenses || true
@@ -33,14 +28,16 @@ jobs:
           echo "google-generativeai" >> requirements.txt
           echo "Pillow" >> requirements.txt
 
-      - name: Build APK (Silent Mode)
+      - name: Build APK (Silent Terminal)
         env:
-          PYTHONWARNINGS: "ignore" # Рятує від помилки 'unicode'
-          TERM: "dumb" # Прибирає спецсимволи з консолі
+          PYTHONWARNINGS: "ignore"
+          # Вимикаємо "красиву" консоль, на якій вішається старий Flet
+          TERM: "dumb"
+          NO_COLOR: "1"
         run: flet build apk
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-V49-APK
+          name: PETROVET-FINAL-APK
           path: build/apk/**/*.apk
