@@ -18,43 +18,16 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Встановлення бібліотек Linux
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev mesa-utils
-
-      - name: Налаштування Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
       - name: Налаштування СТАБІЛЬНОГО Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Прийняття ліцензій Android
-        run: yes | flutter doctor --android-licenses
-
-      - name: Встановлення СТАБІЛЬНОГО Flet та Оновлення Модулів
+      - name: Встановлення чистих бібліотек (Без попереджень і помилок!)
         run: |
-          python -m pip install --upgrade pip
-          pip install urllib3==1.26.18 requests==2.31.0 chardet==5.2.0 charset-normalizer==3.3.2
+          pip install urllib3==1.26.15 requests==2.31.0
           pip install flet==0.28.3
-
-      - name: Вбивця Багів (Патч для Unicode в ядрі)
-        run: |
-          cat << 'EOF' > patch.py
-          import site, os
-          path = os.path.join(site.getsitepackages()[0], 'sitecustomize.py')
-          with open(path, 'w') as f:
-              f.write("import builtins\n")
-              f.write("import sys\n")
-              f.write("builtins.unicode = str\n")
-          EOF
-          python patch.py
 
       - name: Підготовка конфігурації
         run: |
@@ -66,10 +39,6 @@ jobs:
           echo 'description = "vet inspector"' >> flet.toml
 
       - name: Збірка APK
-        env:
-          PYTHONIOENCODING: "utf-8"
-          PYTHONUTF8: "1"
-          LANG: "C.UTF-8"
         run: flet build apk
 
       - name: Збереження готового додатку
