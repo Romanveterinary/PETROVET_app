@@ -1,190 +1,102 @@
 import flet as ft
-import os
 import google.generativeai as genai
+import PIL.Image
+import os
 import datetime
+import base64
+
+# --- КОНФІГУРАЦІЯ ANDROID ---
+# Використовуємо безпечне сховище для ключів та актів
+safe_dir = os.environ.get("FLET_APP_STORAGE", ".")
+key_file_path = os.path.join(safe_dir, "gemini_key.txt")
+DEFAULT_API_KEY = "AIzaSyDHd-5YhrPFUk1Mht2Csfkn0-6xQa0dM2E" # Твій базовий ключ
+
+system_instruction = """
+Ти — провідний ветеринарно-санітарний інспектор-аналітик України. 
+Твоя спеціалізація — контроль безпечності харчових продуктів.
+База знань: Накази №16, №46, №28, №57, №1032, Закони №1870-IV, №771, КУпАП.
+ПРАВИЛО ПРІОРИТЕТУ: Якщо людина-інспектор каже "Недоліків немає", ти встановлюєш ЗЕЛЕНИЙ ризик.
+"""
 
 def main(page: ft.Page):
-    # --- НАЛАШТУВАННЯ СТОРІНКИ ---
-    page.title = "VET-INSPECTOR"
+    page.title = "VET-INSPECTOR AUDIT PRO"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.scroll = ft.ScrollMode.ADAPTIVE
-    page.padding = 15
-    # УВАГА: page.window_width/height НЕ ВИКОРИСТОВУЄТЬСЯ (заборонено для Android)
+    # window_width/height ВИДАЛЕНО (причина білого екрана)
 
-    # --- БЕЗПЕЧНЕ ЗБЕРЕЖЕННЯ ДАНИХ ---
-    # Використовуємо внутрішню папку додатка замість client_storage
-    safe_dir = os.environ.get("FLET_APP_STORAGE", ".")
-    key_file_path = os.path.join(safe_dir, "api_key.txt")
-    DEFAULT_API_KEY = "ВАШ_БАЗОВИЙ_КЛЮЧ"
-    
     def get_saved_key():
-        try:
-            if os.path.exists(key_file_path):
-                with open(key_file_path, "r") as f:
-                    return f.read().strip()
-        except:
-            pass
+        if os.path.exists(key_file_path):
+            try:
+                with open(key_file_path, "r") as f: return f.read().strip()
+            except: pass
         return DEFAULT_API_KEY
 
-    # --- ЛОГІКА ТА ЗМІННІ ---
-    system_instruction = (
-        "Ти — провідний ветеринарно-санітарний інспектор-аналітик. "
-        "Твоє завдання: аналізувати фото м'яса та обладнання згідно з Наказами №28 та №1032 України."
-    )
+    genai.configure(api_key=get_saved_key())
     selected_image_paths = []
-    
-    # Контейнер для прев'ю зображень
     images_row = ft.Row(wrap=True, spacing=10)
-    
-    # Елемент вибору файлів
-    fp_photo = ft.FilePicker()
-    
-    def pick_file_result(e: ft.FilePickerResultEvent):
-        if e.files:
-            for f in e.files:
-                selected_image_paths.append(f.path)
-                images_row.controls.append(
-                    ft.Image(
-                        src=f.path, 
-                        width=80, 
-                        height=80, 
-                        fit=ft.ImageFit.COVER, 
-                        border_radius=5
-                    )
-                )
-            page.update()
-            
-    fp_photo.on_result = pick_file_result
-    page.overlay.append(fp_photo)
 
-    # --- ПАНЕЛЬ НАЛАШТУВАНЬ (API KEY) ---
-    api_key_input = ft.TextField(
-        label="Gemini API Key", 
-        password=True, 
-        can_reveal_password=True, 
-        value=get_saved_key()
-    )
-    
-    def save_api_key(e):
-        try:
-            with open(key_file_path, "w") as f:
-                f.write(api_key_input.value.strip())
-            page.close(settings_dialog)
-            page.open(ft.SnackBar(content=ft.Text("✅ Ключ збережено!"), bgcolor="green"))
-        except:
-            page.open(ft.SnackBar(content=ft.Text("❌ Помилка запису"), bgcolor="red"))
+    # --- UI ПАНЕЛЬ НАЛАШТУВАНЬ ---
+    api_key_input = ft.TextField(label="Gemini API Key", value=get_saved_key(), password=True, can_reveal_password=True)
+    def save_key(e):
+        with open(key_file_path, "w") as f: f.write(api_key_input.value.strip())
+        genai.configure(api_key=api_key_input.value.strip())
+        page.close(settings_dialog)
+        page.update()
 
-    settings_dialog = ft.AlertDialog(
-        title=ft.Text("Налаштування API"),
-        content=api_key_input,
-        actions=[ft.TextButton("Зберегти", on_click=save_api_key)]
-    )
+    settings_dialog = ft.AlertDialog(title=ft.Text("Налаштування"), content=api_key_input, actions=[ft.TextButton("Зберегти", on_click=save_key)])
 
-    # --- ІНТЕРФЕЙС ---
+    # --- ЕЛЕМЕНТИ ІНТЕРФЕЙСУ ---
     title_row = ft.Row([
-        ft.Text("VET-INSPECTOR", size=20, weight="bold", color=ft.colors.BLUE_900),
-        ft.IconButton(icon=ft.icons.SETTINGS, on_click=lambda e: page.open(settings_dialog))
+        ft.Text("PETROVET 49.0", size=20, weight="bold", color=ft.colors.BLUE_900),
+        ft.IconButton(icon=ft.icons.SETTINGS, on_click=lambda _: page.open(settings_dialog))
     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
     
-    object_dropdown = ft.Dropdown(
-        label="Об'єкт контролю",
-        options=[
-            ft.dropdown.Option("М'ясо (туші)"), 
-            ft.dropdown.Option("Місце торгівлі"),
-            ft.dropdown.Option("Обладнання бойні")
-        ],
-        value="М'ясо (туші)"
-    )
-    
-    temp_input = ft.TextField(label="Температура °C", value="38.0", keyboard_type=ft.KeyboardType.NUMBER)
-    inspector_comment = ft.TextField(label="Коментар інспектора", multiline=True)
-    
-    risk_indicator = ft.Text("РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО", color=ft.colors.GREY, weight="bold")
-    ai_response_text = ft.Text(value="Очікування даних...", selectable=True, size=14)
+    object_dropdown = ft.Dropdown(label="Об'єкт", options=[ft.dropdown.Option(x) for x in ["М'ясо", "Молоко", "Риба", "Місце торгівлі"]], width=350)
+    temp_input = ft.TextField(label="T °C", width=80)
+    inspector_comment = ft.TextField(label="Коментар інспектора", width=250)
+    risk_indicator = ft.Container(content=ft.Text("РИЗИК: НЕ ВИЗНАЧЕНО", color="white"), bgcolor="grey", padding=10, border_radius=5, alignment=ft.alignment.center)
+    ai_res = ft.Markdown(value="*Очікування...*", selectable=True)
 
-    # --- ФУНКЦІЯ АНАЛІЗУ ---
-    def perform_analysis(e):
-        if not selected_image_paths:
-            page.open(ft.SnackBar(content=ft.Text("❌ Будь ласка, додайте хоча б одне фото!")))
-            return
-            
-        ai_response_text.value = "⏳ ШІ аналізує фото та нормативи..."
+    fp = ft.FilePicker(on_result=lambda e: (
+        [selected_image_paths.append(f.path) for f in e.files],
+        [images_row.controls.append(ft.Image(src=f.path, width=90, height=90, fit="cover", border_radius=5)) for f in e.files],
         page.update()
+    ) if e.files else None)
+    page.overlay.append(fp)
 
+    def analyze(e):
+        if "пиво будеш" in inspector_comment.value.lower(): # Твій жарт
+            ai_res.value = "## БЕЗ РОМАНА ВАСИЛЬОВИЧА НІ ! 🍻"; page.update(); return
+        if not selected_image_paths: return
+        ai_res.value = "⏳ *Аналіз...*"; page.update()
         try:
-            genai.configure(api_key=get_saved_key())
-            # Використовуємо стабільну модель для візуального аналізу
             model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=system_instruction)
-            
-            prompt = (
-                f"Об'єкт: {object_dropdown.value}\n"
-                f"Температура: {temp_input.value}\n"
-                f"Коментар: {inspector_comment.value}\n\n"
-                "ЗАВДАННЯ: Перевір на відповідність ветеринарним нормам України. "
-                "Обов'язково вкажи один з тегів: [РИЗИК_ЗЕЛЕНИЙ], [РИЗИК_ЖОВТИЙ], [РИЗИК_ЧЕРВОНИЙ]."
-            )
-            
-            contents = []
-            for path in selected_image_paths:
-                with open(path, "rb") as f:
-                    contents.append({'mime_type': 'image/jpeg', 'data': f.read()})
-            contents.append(prompt)
-
-            response = model.generate_content(contents)
-            result_text = response.text
-            
-            # Обробка результатів ризику
-            if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
-                risk_indicator.color, risk_indicator.value = ft.colors.GREEN, "РІВЕНЬ РИЗИКУ: НИЗЬКИЙ (ЗЕЛЕНИЙ)"
-            elif "[РИЗИК_ЖОВТИЙ]" in result_text:
-                risk_indicator.color, risk_indicator.value = ft.colors.YELLOW_800, "РІВЕНЬ РИЗИКУ: СЕРЕДНІЙ (ЖОВТИЙ)"
-            elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
-                risk_indicator.color, risk_indicator.value = ft.colors.RED, "РІВЕНЬ РИЗИКУ: КРИТИЧНИЙ (ЧЕРВОНИЙ)"
-
-            ai_response_text.value = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "").strip()
-        except Exception as err:
-             ai_response_text.value = f"❌ Помилка: {str(err)}"
+            imgs = [PIL.Image.open(p) for p in selected_image_paths]
+            prompt = f"Об'єкт: {object_dropdown.value}, T: {temp_input.value}, Коментар: {inspector_comment.value}. Визнач ризик: [РИЗИК_ЗЕЛЕНИЙ], [РИЗИК_ЖОВТИЙ], [РИЗИК_ЧЕРВОНИЙ]."
+            response = model.generate_content([prompt] + imgs)
+            text = response.text
+            if "[РИЗИК_ЗЕЛЕНИЙ]" in text: risk_indicator.bgcolor, risk_indicator.content.value = "green", "РИЗИК: ЗЕЛЕНИЙ"
+            elif "[РИЗИК_ЖОВТИЙ]" in text: risk_indicator.bgcolor, risk_indicator.content.value = "orange", "РИЗИК: ЖОВТИЙ"
+            elif "[РИЗИК_ЧЕРВОНИЙ]" in text: risk_indicator.bgcolor, risk_indicator.content.value = "red", "РИЗИК: ЧЕРВОНИЙ"
+            ai_res.value = text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "").strip()
+        except Exception as ex: ai_res.value = f"❌ Помилка: {str(ex)}"
         page.update()
 
-    def reset_form(e):
-        selected_image_paths.clear()
-        images_row.controls.clear()
-        temp_input.value = "38.0"
-        inspector_comment.value = ""
-        ai_response_text.value = "Очікування даних..."
-        risk_indicator.color, risk_indicator.value = ft.colors.GREY, "РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО"
-        page.update()
+    def make_act(e):
+        filename = f"AKT_{datetime.datetime.now().strftime('%H%M%S')}.html"
+        path = os.path.join(safe_dir, filename)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(f"<html><body><h1>АКТ PETROVET</h1><p>{ai_res.value}</p></body></html>")
+        page.open(ft.SnackBar(ft.Text(f"✅ Акт збережено: {filename}")))
 
-    # Додавання елементів на екран
     page.add(
         title_row,
-        ft.ElevatedButton(
-            "📷 ДОДАТИ ФОТО", 
-            icon=ft.icons.CAMERA_ALT, 
-            on_click=lambda _: fp_photo.pick_files(allow_multiple=True)
-        ),
-        images_row,
-        object_dropdown,
-        temp_input,
-        inspector_comment,
-        ft.ElevatedButton(
-            "🔍 ПРОВЕСТИ ОБСТЕЖЕННЯ", 
-            icon=ft.icons.GAVEL, 
-            on_click=perform_analysis, 
-            bgcolor=ft.colors.BLUE_900, 
-            color=ft.colors.WHITE
-        ),
-        risk_indicator,
-        ft.Divider(),
-        ai_response_text,
-        ft.Divider(),
-        ft.ElevatedButton(
-            "🔄 НОВЕ ОБСТЕЖЕННЯ", 
-            icon=ft.icons.REFRESH, 
-            on_click=reset_form, 
-            color=ft.colors.RED_700
-        )
+        ft.Row([ft.ElevatedButton("📷 ФОТО", on_click=lambda _: fp.pick_files(allow_multiple=True)),
+                ft.ElevatedButton("🔄 Скинути", on_click=lambda _: (selected_image_paths.clear(), images_row.controls.clear(), page.update()))]),
+        images_row, object_dropdown, ft.Row([temp_input, inspector_comment]),
+        ft.ElevatedButton("🔍 АНАЛІЗ", on_click=analyze, width=350, bgcolor=ft.colors.BLUE_900, color="white"),
+        risk_indicator, ft.Divider(), ai_res,
+        ft.ElevatedButton("📄 СКЛАСТИ АКТ", on_click=make_act, width=350, bgcolor="green", color="white")
     )
 
-# Запуск додатка
 ft.app(target=main)
