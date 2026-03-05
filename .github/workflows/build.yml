@@ -1,47 +1,38 @@
 name: Build Android APK
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ "main", "master" ]
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Завантаження коду
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Налаштування Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Налаштування СТАБІЛЬНОГО Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Встановлення Flet
+      - name: Install Flet
         run: pip install flet==0.28.3
 
-      - name: Підготовка конфігурації
+      - name: Create requirements
         run: |
-          rm -f requirements.txt flet.toml flet_config.toml
           echo "flet==0.28.3" > requirements.txt
-          echo "[app]" > flet.toml
-          echo 'id = "com.petrovet.app"' >> flet.toml
-          echo 'name = "petrovetapp"' >> flet.toml
-          echo 'description = "vet inspector"' >> flet.toml
+          echo "google-generativeai" >> requirements.txt
 
-      - name: Збірка APK (БЛОКУВАННЯ ПОПЕРЕДЖЕНЬ PYTHON)
-        env:
-          PYTHONWARNINGS: "ignore"
+      - name: Build APK
         run: flet build apk
 
-      - name: Збереження готового додатку
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: VET-INSPECTOR-APP
