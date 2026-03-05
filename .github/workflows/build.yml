@@ -29,27 +29,32 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Встановлення Android Studio (Для 100% зеленого Flutter Doctor)
-        run: |
-          wget https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.1.1.12/android-studio-2024.1.1.12-linux.tar.gz
-          tar -xzf android-studio-2024.1.1.12-linux.tar.gz
-          sudo mv android-studio /usr/local/
-          echo 'export PATH=$PATH:/usr/local/android-studio/bin' >> $GITHUB_ENV
-
       - name: Налаштування СТАБІЛЬНОГО Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Вказуємо шлях до Android Studio для Flutter
-        run: flutter config --android-studio-dir=/usr/local/android-studio
-
       - name: Прийняття ліцензій Android
         run: yes | flutter doctor --android-licenses
 
-      - name: Встановлення СТАБІЛЬНОГО Flet
-        run: pip install flet==0.28.3
+      - name: Встановлення СТАБІЛЬНОГО Flet та Оновлення Модулів
+        run: |
+          python -m pip install --upgrade pip
+          pip install urllib3==1.26.18 requests==2.31.0 chardet==5.2.0 charset-normalizer==3.3.2
+          pip install flet==0.28.3
+
+      - name: Вбивця Багів (Патч для Unicode в ядрі)
+        run: |
+          cat << 'EOF' > patch.py
+          import site, os
+          path = os.path.join(site.getsitepackages()[0], 'sitecustomize.py')
+          with open(path, 'w') as f:
+              f.write("import builtins\n")
+              f.write("import sys\n")
+              f.write("builtins.unicode = str\n")
+          EOF
+          python patch.py
 
       - name: Підготовка конфігурації
         run: |
