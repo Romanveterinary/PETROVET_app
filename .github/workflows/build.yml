@@ -16,28 +16,34 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          # Вказуємо конкретну версію, щоб уникнути 3.29.2
-          flutter-version: '3.24.3' 
+          flutter-version: '3.24.3'
           channel: 'stable'
+          cache: true # Додаємо кеш, щоб пришвидшити наступні спроби
 
-      - name: Accept Android Licenses
-        # Це прибере попередження, яке викликає помилку 'unicode'
-        run: yes | sdkmanager --licenses || true
+      - name: Pre-accept Licenses & Clean Doctor
+        # Виконуємо це окремо, щоб flet build не бачив цих повідомлень
+        run: |
+          yes | sdkmanager --licenses || true
+          flutter doctor --android-licenses || true
+          flutter doctor # Проганяємо заздалегідь, щоб кешувати результати
 
-      - name: Install Flet
+      - name: Install Flet & Tools
         run: |
           pip install flet==0.28.3
           echo "flet==0.28.3" > requirements.txt
           echo "google-generativeai" >> requirements.txt
 
-      - name: Build APK (БЕЗ КОНСОЛЬНОГО СМІТТЯ)
+      - name: Build APK (Nuclear Option)
         env:
           PYTHONWARNINGS: "ignore"
-          # Додаємо примусове ігнорування кодування в терміналі
           PYTHONIOENCODING: "utf-8"
-        run: flet build apk
+          # Змушуємо консоль бути "тупою", без кольорів та спецсимволів
+          TERM: "dumb"
+          NO_COLOR: "1"
+        run: flet build apk --verbose
         
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: VET-INSPECTOR-APP
