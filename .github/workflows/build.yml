@@ -1,10 +1,10 @@
-name: Build Android APK
+name: Build VetAI APK (Flet)
 on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 25 # Якщо за 25 хв не зібралося — скасовуємо автоматично
+    timeout-minutes: 25 # Авто-скасування, якщо знову зависне
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -12,11 +12,11 @@ jobs:
           python-version: '3.11'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3' # Суворо дотримуємось лімітів
+          flutter-version: '3.24.3' # Суворо ця версія
           channel: 'stable'
 
-      - name: Force Accept Android Licenses
-        # Це найважливіше — кажемо "так" на всі ліцензії заздалегідь
+      - name: Force Accept Licenses
+        # Це прибирає запити на підтвердження, які вішають збірку
         run: |
           yes | sdkmanager --licenses || true
           flutter doctor --android-licenses || true
@@ -28,16 +28,16 @@ jobs:
           echo "google-generativeai" >> requirements.txt
           echo "Pillow" >> requirements.txt
 
-      - name: Build APK (Silent Terminal)
+      - name: Build APK
         env:
-          PYTHONWARNINGS: "ignore"
-          # Вимикаємо "красиву" консоль, на якій вішається старий Flet
-          TERM: "dumb"
+          PYTHONWARNINGS: "ignore" # Рятує від помилки 'unicode'
+          TERM: "dumb" # Вимикає кольорову консоль
           NO_COLOR: "1"
         run: flet build apk
         
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-FINAL-APK
+          name: PETROVET-V49-APK
           path: build/apk/**/*.apk
