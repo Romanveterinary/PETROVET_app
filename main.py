@@ -1,21 +1,20 @@
 import flet as ft
-import urllib.request
-import urllib.error
-import base64
-import json
 import os
-import datetime
+import google.generativeai as genai
 
 def main(page: ft.Page):
+    # Налаштування з вашого робочого VetAI Pro
     page.title = "VET-INSPECTOR"
     page.theme_mode = ft.ThemeMode.LIGHT
-    page.scroll = ft.ScrollMode.AUTO 
+    page.scroll = ft.ScrollMode.ADAPTIVE
+    page.window_width = 400
+    page.window_height = 800
     page.padding = 15
 
-    # Сейф-папка (як у VetAI)
+    # Безпечна папка для Андроїда
     safe_dir = os.environ.get("FLET_APP_STORAGE", ".")
     key_file_path = os.path.join(safe_dir, "api_key.txt")
-    DEFAULT_API_KEY = "ВАШ_ПЕРШИЙ_КЛЮЧ_ТУТ"
+    DEFAULT_API_KEY = "ВАШ_БАЗОВИЙ_КЛЮЧ"
     
     def get_saved_key():
         try:
@@ -25,7 +24,7 @@ def main(page: ft.Page):
         except: pass
         return DEFAULT_API_KEY
 
-    system_instruction = "Ти — провідний ветеринарно-санітарний інспектор-аналітик України..."
+    system_instruction = "Ти — провідний ветеринарно-санітарний інспектор-аналітик."
     selected_image_paths = []
     
     images_row = ft.Row(wrap=True, spacing=10)
@@ -41,16 +40,16 @@ def main(page: ft.Page):
     fp_photo.on_result = pick_file_result
     page.overlay.append(fp_photo)
 
-    api_key_input = ft.TextField(label="Новий Gemini API Key", password=True, can_reveal_password=True, value=get_saved_key())
+    api_key_input = ft.TextField(label="Gemini API Key", password=True, can_reveal_password=True, value=get_saved_key())
     
     def save_api_key(e):
         try:
             with open(key_file_path, "w") as f:
                 f.write(api_key_input.value.strip())
             page.close(settings_dialog)
-            page.open(ft.SnackBar(content=ft.Text("✅ Новий API Ключ збережено!"), bgcolor="green"))
+            page.open(ft.SnackBar(content=ft.Text("✅ Ключ збережено!"), bgcolor="green"))
         except Exception as ex:
-            page.open(ft.SnackBar(content=ft.Text(f"❌ Помилка: {ex}"), bgcolor="red"))
+            pass
 
     settings_dialog = ft.AlertDialog(
         title=ft.Text("Налаштування API"),
@@ -65,70 +64,57 @@ def main(page: ft.Page):
     
     object_dropdown = ft.Dropdown(
         label="Об'єкт контролю",
-        options=[
-            ft.dropdown.Option("М'ясо (туші)"),
-            ft.dropdown.Option("Молоко та молочні продукти"),
-            ft.dropdown.Option("Риба жива"),
-            ft.dropdown.Option("Інші харчові товари"),
-            ft.dropdown.Option("Місце торгівлі/Обладнання"),
-        ]
+        options=[ft.dropdown.Option("М'ясо (туші)"), ft.dropdown.Option("Місце торгівлі")],
+        value="М'ясо (туші)"
     )
     
-    temp_input = ft.TextField(label="Температура °C")
+    temp_input = ft.TextField(label="Температура °C", value="38.0")
     inspector_comment = ft.TextField(label="Висновок інспектора", multiline=True)
     
     risk_indicator = ft.Text("РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО", color=ft.colors.GREY, weight="bold")
     ai_response_text = ft.Text(value="Очікування об'єкта...", selectable=True, size=14)
 
     def perform_analysis(e):
-        if "пиво" in inspector_comment.value.lower():
-            ai_response_text.value = "БЕЗ РОМАНА ВАСИЛЬОВИЧА НІ ! 🍻"
-            risk_indicator.color = ft.colors.BLUE
-            risk_indicator.value = "РЕЖИМ ВІДПОЧИНКУ"
-            page.update()
-            return
-
         if not selected_image_paths:
-            ai_response_text.value = "❌ Будь ласка, додайте хоча б одне фото."
+            ai_response_text.value = "❌ Додайте фото."
             page.update()
             return
             
-        ai_response_text.value = "⏳ Збираю дані та формую юридичне обґрунтування..."
+        ai_response_text.value = "⏳ Аналіз даних..."
         page.update()
 
         try:
-            current_key = get_saved_key()
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={current_key}"
-            prompt = f"Проаналізуй фото.\nОб'єкт: {object_dropdown.value}\nТемпература: {temp_input.value} °C\nВИСНОВОК: {inspector_comment.value}\n\n1. Визнач ризик.\n2. Опиши порушення."
-
-            parts = [{"text": prompt}]
-            for path in selected_image_paths:
-                with open(path, "rb") as img_file:
-                    parts.append({"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(img_file.read()).decode("utf-8")}})
-
-            payload = {"system_instruction": {"parts": [{"text": system_instruction}]}, "contents": [{"parts": parts}]}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            # Використовуємо бібліотеку genai, як у вашому VetAI
+            genai.configure(api_key=get_saved_key())
+            model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=system_instruction)
             
-            with urllib.request.urlopen(req) as response:
-                result_text = json.loads(response.read().decode('utf-8'))["candidates"][0]["content"]["parts"][0]["text"]
-                
-                if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
-                    risk_indicator.color, risk_indicator.value = ft.colors.GREEN, "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
-                elif "[РИЗИК_ЖОВТИЙ]" in result_text:
-                    risk_indicator.color, risk_indicator.value = ft.colors.YELLOW_800, "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
-                elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
-                    risk_indicator.color, risk_indicator.value = ft.colors.RED, "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
+            prompt = f"Об'єкт: {object_dropdown.value}\nТемпература: {temp_input.value}\nВисновок: {inspector_comment.value}\nВизнач ризик: [РИЗИК_ЗЕЛЕНИЙ], [РИЗИК_ЖОВТИЙ] або [РИЗИК_ЧЕРВОНИЙ]. Опиши порушення."
+            
+            contents = []
+            for path in selected_image_paths:
+                with open(path, "rb") as f:
+                    contents.append({'mime_type': 'image/jpeg', 'data': f.read()})
+            contents.append(prompt)
 
-                ai_response_text.value = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "").strip()
-        except Exception as http_err:
-             ai_response_text.value = f"❌ Помилка API: {str(http_err)}"
+            response = model.generate_content(contents)
+            result_text = response.text
+            
+            if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
+                risk_indicator.color, risk_indicator.value = ft.colors.GREEN, "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
+            elif "[РИЗИК_ЖОВТИЙ]" in result_text:
+                risk_indicator.color, risk_indicator.value = ft.colors.YELLOW_800, "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
+            elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
+                risk_indicator.color, risk_indicator.value = ft.colors.RED, "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
+
+            ai_response_text.value = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "").strip()
+        except Exception as err:
+             ai_response_text.value = f"❌ Помилка: {str(err)}"
         page.update()
 
     def reset_form(e):
         selected_image_paths.clear()
         images_row.controls.clear()
         temp_input.value = inspector_comment.value = ""
-        object_dropdown.value = None
         ai_response_text.value = "Очікування об'єкта..."
         risk_indicator.color, risk_indicator.value = ft.colors.GREY, "РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО"
         page.update()
