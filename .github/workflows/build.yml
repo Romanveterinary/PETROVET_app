@@ -29,26 +29,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Встановлення Android Studio (Для 100% зеленого Flutter Doctor)
+        run: |
+          wget https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.1.1.12/android-studio-2024.1.1.12-linux.tar.gz
+          tar -xzf android-studio-2024.1.1.12-linux.tar.gz
+          sudo mv android-studio /usr/local/
+          echo 'export PATH=$PATH:/usr/local/android-studio/bin' >> $GITHUB_ENV
+
       - name: Налаштування СТАБІЛЬНОГО Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
           channel: 'stable'
 
+      - name: Вказуємо шлях до Android Studio для Flutter
+        run: flutter config --android-studio-dir=/usr/local/android-studio
+
       - name: Прийняття ліцензій Android
         run: yes | flutter doctor --android-licenses
-
-      - name: Вбивця Багів (Патч для Unicode)
-        run: |
-          cat << 'EOF' > patch.py
-          import site, os
-          path = os.path.join(site.getsitepackages()[0], 'sitecustomize.py')
-          with open(path, 'w') as f:
-              f.write("import builtins\n")
-              f.write("import sys\n")
-              f.write("builtins.unicode = str\n")
-          EOF
-          python patch.py
 
       - name: Встановлення СТАБІЛЬНОГО Flet
         run: pip install flet==0.28.3
@@ -62,10 +60,11 @@ jobs:
           echo 'name = "petrovetapp"' >> flet.toml
           echo 'description = "vet inspector"' >> flet.toml
 
-      - name: Збірка APK (Примусовий UTF-8)
+      - name: Збірка APK
         env:
           PYTHONIOENCODING: "utf-8"
           PYTHONUTF8: "1"
+          LANG: "C.UTF-8"
         run: flet build apk
 
       - name: Збереження готового додатку
