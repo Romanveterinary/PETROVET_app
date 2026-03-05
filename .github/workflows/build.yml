@@ -16,29 +16,29 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3' # СУВОРО ЦЯ ВЕРСІЯ
+          flutter-version: '3.24.3' # Тримаємось старої стабільної версії
           channel: 'stable'
 
-      - name: Pre-accept Licenses
-        # Це прибере запити на підтвердження, які "вішають" збірку
+      - name: Force Accept Android Licenses
+        # Це найголовніше, щоб збірка не "висіла", чекаючи на натискання 'y'
         run: |
           yes | sdkmanager --licenses || true
           flutter doctor --android-licenses || true
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           pip install flet==0.28.3
           echo "flet==0.28.3" > requirements.txt
           echo "google-generativeai" >> requirements.txt
 
-      - name: Build APK (Silent Terminal Mode)
+      - name: Build APK (No-Interactive Mode)
         env:
           PYTHONWARNINGS: "ignore"
           PYTHONIOENCODING: "utf-8"
-          # ТЕРМІНАЛ "DUMB" ПРИБИРАЄ КОЛЬОРИ ТА АНІМАЦІЇ (Рятує від помилки unicode)
+          # Робимо термінал "тупим", щоб Flet не ламався об кольорові символи
           TERM: "dumb"
           NO_COLOR: "1"
-        run: flet build apk
+        run: flet build apk --verbose # Додаємо verbose, щоб бачити, де саме затик, якщо впаде
         
       - name: Upload APK
         if: success()
