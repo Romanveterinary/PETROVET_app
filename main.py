@@ -7,16 +7,14 @@ import os
 import datetime
 
 def main(page: ft.Page):
-    # ВИДАЛЕНО window_width та window_height, які вбивали Android!
     page.title = "VET-INSPECTOR"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.scroll = ft.ScrollMode.AUTO 
     page.padding = 15
 
-    # БЕЗПЕЧНА ПАПКА АНДРОЇД
+    # Сейф-папка (як у VetAI)
     safe_dir = os.environ.get("FLET_APP_STORAGE", ".")
     key_file_path = os.path.join(safe_dir, "api_key.txt")
-
     DEFAULT_API_KEY = "ВАШ_ПЕРШИЙ_КЛЮЧ_ТУТ"
     
     def get_saved_key():
@@ -24,8 +22,7 @@ def main(page: ft.Page):
             if os.path.exists(key_file_path):
                 with open(key_file_path, "r") as f:
                     return f.read().strip()
-        except:
-            pass
+        except: pass
         return DEFAULT_API_KEY
 
     system_instruction = "Ти — провідний ветеринарно-санітарний інспектор-аналітик України..."
@@ -102,79 +99,47 @@ def main(page: ft.Page):
         try:
             current_key = get_saved_key()
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={current_key}"
-            prompt = f"Проаналізуй фото.\nОб'єкт: {object_dropdown.value}\nТемпература: {temp_input.value} °C\nВИСНОВОК: {inspector_comment.value}\n\n1. Визнач ризик: [РИЗИК_ЗЕЛЕНИЙ], [РИЗИК_ЖОВТИЙ] або [РИЗИК_ЧЕРВОНИЙ].\n2. Опиши порушення та законодавство."
+            prompt = f"Проаналізуй фото.\nОб'єкт: {object_dropdown.value}\nТемпература: {temp_input.value} °C\nВИСНОВОК: {inspector_comment.value}\n\n1. Визнач ризик.\n2. Опиши порушення."
 
             parts = [{"text": prompt}]
             for path in selected_image_paths:
                 with open(path, "rb") as img_file:
-                    b64_data = base64.b64encode(img_file.read()).decode("utf-8")
-                    parts.append({"inline_data": {"mime_type": "image/jpeg", "data": b64_data}})
+                    parts.append({"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(img_file.read()).decode("utf-8")}})
 
-            payload = {
-                "system_instruction": {"parts": [{"text": system_instruction}]},
-                "contents": [{"parts": parts}]
-            }
-
+            payload = {"system_instruction": {"parts": [{"text": system_instruction}]}, "contents": [{"parts": parts}]}
             req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            
             with urllib.request.urlopen(req) as response:
-                result_data = json.loads(response.read().decode('utf-8'))
-                result_text = result_data["candidates"][0]["content"]["parts"][0]["text"]
+                result_text = json.loads(response.read().decode('utf-8'))["candidates"][0]["content"]["parts"][0]["text"]
                 
                 if "[РИЗИК_ЗЕЛЕНИЙ]" in result_text:
-                    risk_indicator.color = ft.colors.GREEN
-                    risk_indicator.value = "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
+                    risk_indicator.color, risk_indicator.value = ft.colors.GREEN, "РІВЕНЬ РИЗИКУ: ЗЕЛЕНИЙ"
                 elif "[РИЗИК_ЖОВТИЙ]" in result_text:
-                    risk_indicator.color = ft.colors.YELLOW_800
-                    risk_indicator.value = "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
+                    risk_indicator.color, risk_indicator.value = ft.colors.YELLOW_800, "РІВЕНЬ РИЗИКУ: ЖОВТИЙ"
                 elif "[РИЗИК_ЧЕРВОНИЙ]" in result_text:
-                    risk_indicator.color = ft.colors.RED
-                    risk_indicator.value = "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
+                    risk_indicator.color, risk_indicator.value = ft.colors.RED, "РІВЕНЬ РИЗИКУ: ЧЕРВОНИЙ"
 
-                result_text = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "")
-                ai_response_text.value = result_text.strip()
+                ai_response_text.value = result_text.replace("[РИЗИК_ЗЕЛЕНИЙ]", "").replace("[РИЗИК_ЖОВТИЙ]", "").replace("[РИЗИК_ЧЕРВОНИЙ]", "").strip()
         except Exception as http_err:
              ai_response_text.value = f"❌ Помилка API: {str(http_err)}"
-        page.update()
-
-    def generate_act(e):
-        if not ai_response_text.value or "Очікування" in ai_response_text.value: return
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"AKT_{current_time}.html"
-        
-        filepath = os.path.join(safe_dir, filename)
-        try:
-            with open(filepath, "w", encoding="utf-8") as file:
-                file.write(f"<html><body><h1>АКТ</h1><pre>{ai_response_text.value}</pre></body></html>")
-            ai_response_text.value += f"\n\n✅ АКТ ЗБЕРЕЖЕНО в пам'яті програми!"
-        except Exception as ex:
-            ai_response_text.value += f"\n\n❌ Помилка збереження: {ex}"
         page.update()
 
     def reset_form(e):
         selected_image_paths.clear()
         images_row.controls.clear()
-        temp_input.value = ""
-        inspector_comment.value = ""
+        temp_input.value = inspector_comment.value = ""
         object_dropdown.value = None
         ai_response_text.value = "Очікування об'єкта..."
-        risk_indicator.color = ft.colors.GREY
-        risk_indicator.value = "РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО"
+        risk_indicator.color, risk_indicator.value = ft.colors.GREY, "РІВЕНЬ РИЗИКУ: НЕ ВИЗНАЧЕНО"
         page.update()
 
     page.add(
         title_row,
         ft.ElevatedButton("📷 ДОДАТИ ФОТО", icon=ft.icons.CAMERA_ALT, on_click=lambda _: fp_photo.pick_files(allow_multiple=True)),
-        images_row,
-        object_dropdown,
-        temp_input,
-        inspector_comment,
+        images_row, object_dropdown, temp_input, inspector_comment,
         ft.ElevatedButton("🔍 ПРОВЕСТИ ОБСТЕЖЕННЯ", icon=ft.icons.GAVEL, on_click=perform_analysis, bgcolor=ft.colors.BLUE_900, color=ft.colors.WHITE),
-        risk_indicator,
-        ft.Divider(),
-        ai_response_text,
-        ft.Divider(),
-        ft.ElevatedButton("🔄 НОВЕ ОБСТЕЖЕННЯ", icon=ft.icons.REFRESH, on_click=reset_form, color=ft.colors.RED_700),
-        ft.ElevatedButton("📄 СКЛАСТИ АКТ", icon=ft.icons.SAVE, on_click=generate_act, bgcolor=ft.colors.GREEN_700, color=ft.colors.WHITE)
+        risk_indicator, ft.Divider(), ai_response_text, ft.Divider(),
+        ft.ElevatedButton("🔄 НОВЕ ОБСТЕЖЕННЯ", icon=ft.icons.REFRESH, on_click=reset_form, color=ft.colors.RED_700)
     )
 
 ft.app(target=main)
