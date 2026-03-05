@@ -1,11 +1,12 @@
 name: Build Android APK
-
-on: [push, workflow_dispatch]
+on: 
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,22 +19,22 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'
+          flutter-version: '3.24.3' # Суворо дотримуємось версії
           channel: 'stable'
 
-      - name: Install Flet
-        run: pip install flet==0.28.3
-
-      - name: Create requirements
+      - name: Install dependencies
         run: |
+          pip install flet==0.28.3
           echo "flet==0.28.3" > requirements.txt
           echo "google-generativeai" >> requirements.txt
 
-      - name: Build APK
+      - name: Build APK (БЛОКУВАННЯ ПОПЕРЕДЖЕНЬ)
+        env:
+          PYTHONWARNINGS: "ignore" # Рятує від помилки 'unicode'
         run: flet build apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: VET-INSPECTOR-APP
+          name: VET-INSPECTOR-RELEASE
           path: build/apk/**/*.apk
