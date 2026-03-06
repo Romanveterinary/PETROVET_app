@@ -3,15 +3,15 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-20.04 # Максимальна стабільність для шаблонів
+    runs-on: ubuntu-20.04 # Стабільна ОС без конфліктів кодування
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.9' # Версія, де найменше проблем з кодуванням
+          python-version: '3.9'
 
-      - name: System Sterilization
-        # Примусово налаштовуємо UTF-8 на рівні системи
+      - name: Fix System Environment
+        # Примусово налаштовуємо чисте середовище UTF-8
         run: |
           sudo apt-get update
           sudo apt-get install -y locales
@@ -21,19 +21,18 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0' # Перевірена пара для Flet 0.21.2
+          flutter-version: '3.16.0' # Перевірена версія для Android
           channel: 'stable'
 
       - name: Install Flet
-        # Використовуємо версію 0.21.2 як найбільш стійку до багів unicode
+        # Версія 0.21.2 - найбільш стійка до помилок unicode
         run: pip install flet==0.21.2 google-generativeai Pillow
 
-      - name: Build APK (Shield Mode)
+      - name: Build APK (Bypass Unicode Error)
         env:
           LANG: "en_US.UTF-8"
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
-        # Пропускаємо ліцензії та запускаємо чисту збірку
         run: |
           yes | flutter doctor --android-licenses || true
           flet build apk --verbose
@@ -42,5 +41,5 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-PROFIT-GUIDE
+          name: PETROVET-MENTOR-READY
           path: build/apk/**/*.apk
