@@ -3,42 +3,44 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 # Стабільна ОС для пакування
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Fix Android Environment
+      - name: System Locale Fix
+        # Примусове налаштування мови системи, щоб уникнути помилки unicode
         run: |
-          mkdir -p ${ANDROID_HOME}/licenses
-          echo -e "8933bad161affd0fb5b1744237198a28906322b2\nd56239c038234515b191295b28d3e21e64e9a86a" > ${ANDROID_HOME}/licenses/android-sdk-license
+          sudo locale-gen en_US.UTF-8
+          sudo update-locale LANG=en_US.UTF-8
           yes | flutter doctor --android-licenses || true
 
-      - name: Clean Install Dependencies
+      - name: Install Dependencies
         run: |
           pip install --upgrade pip setuptools wheel
-          # Використовуємо 0.21.2 як найбільш "бронебійну" для Android
-          pip install flet==0.21.2 google-generativeai Pillow
+          pip install flet==0.23.2 # Версія з виправленим бутстрапом
+          pip install google-generativeai Pillow
 
-      - name: Build APK (Shield Mode)
+      - name: Build APK (Force UTF-8)
         env:
-          # Вимикаємо анімації та примушуємо використовувати UTF-8
+          # Ці змінні — наш головний захист
+          LANG: "en_US.UTF-8"
+          LC_ALL: "en_US.UTF-8"
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
-          FLET_LOG_LEVEL: "error"
         run: flet build apk --verbose
         
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-EXPERT-V49
+          name: PETROVET-BIZ-ANALYTICS
           path: build/apk/**/*.apk
