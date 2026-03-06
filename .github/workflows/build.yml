@@ -3,31 +3,37 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'
+          flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Fix Environment & Licenses
-        # Вирішуємо проблему зі скріншота 936
+      - name: Critical Environment Fix
+        # Примусово встановлюємо локалі та приймаємо ліцензії
         run: |
-          pip install --upgrade pip setuptools wheel
+          sudo locale-gen en_US.UTF-8
+          sudo update-locale LANG=en_US.UTF-8
           yes | flutter doctor --android-licenses || true
 
-      - name: Install Flet
-        run: pip install flet==0.27.3
+      - name: Install Flet (Stable Version)
+        run: |
+          pip install --upgrade pip setuptools wheel
+          # Версія 0.25.2 має кращу сумісність з Flutter 3.22
+          pip install flet==0.25.2 google-generativeai Pillow
 
-      - name: Build APK (Bypass Unicode Error)
-        # Вирішуємо проблему зі скріншотів 936 та 938
+      - name: Build APK (Shield Mode)
         env:
+          # Ці прапори — наш головний захист від помилки unicode
+          LANG: "en_US.UTF-8"
+          LC_ALL: "en_US.UTF-8"
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
         run: flet build apk --verbose
@@ -36,5 +42,5 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-BIZ-CONSULTANT
+          name: PETROVET-BIZ-ANALYTICS
           path: build/apk/**/*.apk
