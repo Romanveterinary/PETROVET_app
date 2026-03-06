@@ -10,25 +10,24 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Flet CLI
-        run: |
-          pip install --upgrade pip
-          pip install flet==0.23.2 # Стабільна версія
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Force Android Licenses
-        # Цей крок прибирає помилку з твого скріншоту 936
+      - name: Fix Environment & Licenses
+        # Вирішуємо проблему зі скріншота 936
         run: |
+          pip install --upgrade pip setuptools wheel
           yes | flutter doctor --android-licenses || true
 
-      - name: Build APK
+      - name: Install Flet
+        run: pip install flet==0.27.3
+
+      - name: Build APK (Bypass Unicode Error)
+        # Вирішуємо проблему зі скріншотів 936 та 938
         env:
-          # Ці прапори вбивають помилку 'unicode'
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
         run: flet build apk --verbose
@@ -37,5 +36,5 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-STABLE
+          name: PETROVET-BIZ-CONSULTANT
           path: build/apk/**/*.apk
