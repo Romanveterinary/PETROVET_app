@@ -4,7 +4,7 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30 # Даємо трохи більше часу на випадок повільного завантаження SDK
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,12 +20,14 @@ jobs:
           flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Accept Android Licenses (Fixed)
-        # Використовуємо flutter doctor, оскільки sdkmanager може бути недоступний у PATH
+      - name: Force Accept Android Licenses
+        # Використовуємо flutter doctor з автоматичним "yes" для всіх ліцензій
         run: |
-          yes | flutter doctor --android-licenses || true
-          # Про всяк випадок пробуємо шлях за замовчуванням для Android SDK
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          echo "y" | flutter doctor --android-licenses || true
+          # Також створюємо файли-маркери ліцензій вручну для гарантії
+          mkdir -p ${ANDROID_HOME}/licenses
+          echo -e "\n8933bad161affd0fb5b1744237198a28906322b2" > ${ANDROID_HOME}/licenses/android-sdk-license
+          echo -e "\nd56239c038234515b191295b28d3e21e64e9a86a" > ${ANDROID_HOME}/licenses/android-sdk-preview-license
 
       - name: Install Dependencies
         run: |
@@ -34,11 +36,12 @@ jobs:
           echo "google-generativeai" >> requirements.txt
           echo "Pillow" >> requirements.txt
 
-      - name: Build APK (Silent Mode)
+      - name: Build APK (Shield Mode)
         env:
-          PYTHONWARNINGS: "ignore" # Рятує від краху 'unicode' при виводі консолі
-          TERM: "dumb" # Вимикає анімації прогрес-барів, які вішають збірку
+          PYTHONWARNINGS: "ignore"
+          TERM: "dumb"
           NO_COLOR: "1"
+        # Використовуємо build без зайвого виводу, щоб не перевантажувати лог
         run: flet build apk
         
       - name: Upload APK
