@@ -3,36 +3,46 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Змінюємо на стабільну 22.04
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9' # Використовуємо 3.9 для кращої сумісності
+          python-version: '3.11'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0' # Стабільна версія для Flet
           channel: 'stable'
 
-      - name: Force Accept Licenses
-        run: yes | flutter doctor --android-licenses || true
+      - name: Accept Android Licenses
+        # Примусове прийняття ліцензій, щоб збірка не висла
+        run: |
+          yes | flutter doctor --android-licenses || true
+          mkdir -p ${ANDROID_HOME}/licenses
+          echo -e "8933bad161affd0fb5b1744237198a28906322b2\nd56239c038234515b191295b28d3e21e64e9a86a" > ${ANDROID_HOME}/licenses/android-sdk-license
 
       - name: Install Dependencies
+        # Фіксуємо версію 0.25.0, щоб уникнути помилки пошуку 0.28.3
         run: |
-          pip install flet==0.21.2 # Використовуємо перевірену версію
+          pip install flet==0.25.0
           pip install google-generativeai Pillow
 
       - name: Build APK
+        # Додаємо змінні для виправлення помилки 'unicode' та кодування
         env:
-          PYTHONUTF8: "1" # Критично важливий прапор
+          PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
+          TERM: "dumb"
         run: flet build apk --verbose
         
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-STABLE-APK
+          name: PETROVET-FINAL-V49
           path: build/apk/**/*.apk
