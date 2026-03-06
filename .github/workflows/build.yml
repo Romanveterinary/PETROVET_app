@@ -3,43 +3,41 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 # Стабільна ОС
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3' # Використовуємо стабільну версію
+          flutter-version: '3.22.0' # Перевірена версія для Flet 0.23.2
           channel: 'stable'
 
-      - name: Pre-build Environment Fix
-        # Цей крок примусово налаштовує систему на сучасну мову UTF-8
+      - name: Accept Licenses
         run: |
-          sudo locale-gen en_US.UTF-8
-          sudo update-locale LANG=en_US.UTF-8
           yes | flutter doctor --android-licenses || true
+          mkdir -p ${ANDROID_HOME}/licenses
+          echo -e "8933bad161affd0fb5b1744237198a28906322b2\nd56239c038234515b191295b28d3e21e64e9a86a" > ${ANDROID_HOME}/licenses/android-sdk-license
 
       - name: Install Dependencies
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install flet==0.27.3 # Використовуємо версію, де цей баг було виправлено
+          pip install flet==0.23.2
           pip install google-generativeai Pillow
 
-      - name: Build APK
+      - name: Build APK (Bypass Unicode Bug)
         env:
-          # Ці три рядки — наш "дезінфектор" від помилки unicode
-          LANG: en_US.UTF-8
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
+          LANG: "en_US.UTF-8"
         run: flet build apk --verbose
         
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-V49-READY
+          name: PETROVET-WORKING-APK
           path: build/apk/**/*.apk
