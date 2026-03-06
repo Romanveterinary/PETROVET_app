@@ -4,45 +4,36 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10' # Використовуємо 3.10 для кращої сумісності з Flet CLI
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Manual License Injection
-        # Цей блок ми залишаємо, бо він допомагає проскочити запити ліцензій
+      - name: Force Accept Licenses
         run: |
-          mkdir -p ${ANDROID_HOME}/licenses
-          echo -e "8933bad161affd0fb5b1744237198a28906322b2\nd56239c038234515b191295b28d3e21e64e9a86a\n97065fd90437c144962453629e47854617e96b8c" > ${ANDROID_HOME}/licenses/android-sdk-license
-          echo -e "84831b9409646a918e30573bab4c9c91346d8abd\n50466752757b0c35357f747d8b483ae28c943f09" > ${ANDROID_HOME}/licenses/android-sdk-preview-license
+          yes | flutter doctor --android-licenses || true
 
-      - name: Install Dependencies
+      - name: Fix Python Environment
+        # Цей крок прибирає помилку 'unicode is not defined'
         run: |
-          pip install flet==0.28.3
+          pip install --upgrade pip setuptools wheel
+          pip install flet==0.26.0 # Стабільна версія для Android-збірок
           pip install google-generativeai Pillow
 
-      - name: Build APK (Fix Unicode Error)
-        # ОСЬ ТУТ МИ ЛІКУЄМО ПОМИЛКУ 'unicode is not defined'
+      - name: Build APK
         env:
           PYTHONIOENCODING: "utf-8"
-          LANG: "C.UTF-8"
-          TERM: "dumb"
-          NO_COLOR: "1"
+          PYTHONPATH: "."
         run: flet build apk --verbose
         
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-MARKET-STABLE
+          name: PETROVET-V49-STABLE
           path: build/apk/**/*.apk
