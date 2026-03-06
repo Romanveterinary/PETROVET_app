@@ -4,30 +4,23 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Force Accept Android Licenses
-        # Використовуємо flutter doctor з автоматичним "yes" для всіх ліцензій
+      - name: Force Accept Licenses
+        # Вирішує проблему зависання на кроці ліцензій
         run: |
-          echo "y" | flutter doctor --android-licenses || true
-          # Також створюємо файли-маркери ліцензій вручну для гарантії
+          yes | flutter doctor --android-licenses || true
           mkdir -p ${ANDROID_HOME}/licenses
           echo -e "\n8933bad161affd0fb5b1744237198a28906322b2" > ${ANDROID_HOME}/licenses/android-sdk-license
-          echo -e "\nd56239c038234515b191295b28d3e21e64e9a86a" > ${ANDROID_HOME}/licenses/android-sdk-preview-license
 
       - name: Install Dependencies
         run: |
@@ -36,17 +29,14 @@ jobs:
           echo "google-generativeai" >> requirements.txt
           echo "Pillow" >> requirements.txt
 
-      - name: Build APK (Shield Mode)
+      - name: Build APK
         env:
-          PYTHONWARNINGS: "ignore"
+          PYTHONWARNINGS: "ignore" # Фікс для помилки 'unicode'
           TERM: "dumb"
-          NO_COLOR: "1"
-        # Використовуємо build без зайвого виводу, щоб не перевантажувати лог
         run: flet build apk
         
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-V49-APK
+          name: PETROVET-STABLE-APK
           path: build/apk/**/*.apk
