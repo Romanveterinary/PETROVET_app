@@ -3,44 +3,44 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04 # Максимальна стабільність для шаблонів
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.9' # Версія, де найменше проблем з кодуванням
+
+      - name: System Sterilization
+        # Примусово налаштовуємо UTF-8 на рівні системи
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales
+          sudo locale-gen en_US.UTF-8
+          pip install --upgrade pip setuptools wheel
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.16.0' # Перевірена пара для Flet 0.21.2
           channel: 'stable'
 
-      - name: Critical Environment Fix
-        # Примусово встановлюємо локалі та приймаємо ліцензії
-        run: |
-          sudo locale-gen en_US.UTF-8
-          sudo update-locale LANG=en_US.UTF-8
-          yes | flutter doctor --android-licenses || true
-
-      - name: Install Flet (Stable Version)
-        run: |
-          pip install --upgrade pip setuptools wheel
-          # Версія 0.25.2 має кращу сумісність з Flutter 3.22
-          pip install flet==0.25.2 google-generativeai Pillow
+      - name: Install Flet
+        # Використовуємо версію 0.21.2 як найбільш стійку до багів unicode
+        run: pip install flet==0.21.2 google-generativeai Pillow
 
       - name: Build APK (Shield Mode)
         env:
-          # Ці прапори — наш головний захист від помилки unicode
           LANG: "en_US.UTF-8"
-          LC_ALL: "en_US.UTF-8"
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
-        run: flet build apk --verbose
+        # Пропускаємо ліцензії та запускаємо чисту збірку
+        run: |
+          yes | flutter doctor --android-licenses || true
+          flet build apk --verbose
         
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-BIZ-ANALYTICS
+          name: PETROVET-PROFIT-GUIDE
           path: build/apk/**/*.apk
