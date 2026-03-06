@@ -3,39 +3,37 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Стабільна ОС для пакування
+    runs-on: ubuntu-20.04 # Змінюємо на 20.04 для максимальної сумісності
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.9' # Використовуємо 3.9
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.16.0' # Стабільна версія для пакування
           channel: 'stable'
 
-      - name: System Locale Fix
-        # Примусове налаштування мови системи, щоб уникнути помилки unicode
+      - name: System Fixes
         run: |
+          sudo apt-get update
+          sudo apt-get install -y locales
           sudo locale-gen en_US.UTF-8
-          sudo update-locale LANG=en_US.UTF-8
+          export LANG=en_US.UTF-8
           yes | flutter doctor --android-licenses || true
 
       - name: Install Dependencies
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install flet==0.23.2 # Версія з виправленим бутстрапом
+          pip install flet==0.21.2 
           pip install google-generativeai Pillow
 
-      - name: Build APK (Force UTF-8)
+      - name: Build APK
         env:
-          # Ці змінні — наш головний захист
           LANG: "en_US.UTF-8"
-          LC_ALL: "en_US.UTF-8"
           PYTHONUTF8: "1"
-          PYTHONIOENCODING: "utf-8"
         run: flet build apk --verbose
         
       - name: Upload APK
