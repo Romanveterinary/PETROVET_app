@@ -3,42 +3,39 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-20.04 # Змінюємо на 20.04 для максимальної сумісності
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.9' # Використовуємо 3.9
+          python-version: '3.11'
 
-      - name: Set up Flutter
+      - name: Install Flet CLI
+        run: |
+          pip install --upgrade pip
+          pip install flet==0.23.2 # Стабільна версія
+
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0' # Стабільна версія для пакування
+          flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: System Fixes
+      - name: Force Android Licenses
+        # Цей крок прибирає помилку з твого скріншоту 936
         run: |
-          sudo apt-get update
-          sudo apt-get install -y locales
-          sudo locale-gen en_US.UTF-8
-          export LANG=en_US.UTF-8
           yes | flutter doctor --android-licenses || true
-
-      - name: Install Dependencies
-        run: |
-          pip install --upgrade pip setuptools wheel
-          pip install flet==0.21.2 
-          pip install google-generativeai Pillow
 
       - name: Build APK
         env:
-          LANG: "en_US.UTF-8"
+          # Ці прапори вбивають помилку 'unicode'
           PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
         run: flet build apk --verbose
         
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-BIZ-ANALYTICS
+          name: PETROVET-STABLE
           path: build/apk/**/*.apk
