@@ -3,37 +3,36 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # Змінюємо на стабільну 22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Використовуємо 3.10 для кращої сумісності з Flet CLI
+          python-version: '3.9' # Використовуємо 3.9 для кращої сумісності
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.19.0' # Стабільна версія для Flet
           channel: 'stable'
 
       - name: Force Accept Licenses
-        run: |
-          yes | flutter doctor --android-licenses || true
+        run: yes | flutter doctor --android-licenses || true
 
-      - name: Fix Python Environment
-        # Цей крок прибирає помилку 'unicode is not defined'
+      - name: Install Dependencies
         run: |
-          pip install --upgrade pip setuptools wheel
-          pip install flet==0.26.0 # Стабільна версія для Android-збірок
+          pip install flet==0.21.2 # Використовуємо перевірену версію
           pip install google-generativeai Pillow
 
       - name: Build APK
         env:
+          PYTHONUTF8: "1" # Критично важливий прапор
           PYTHONIOENCODING: "utf-8"
-          PYTHONPATH: "."
         run: flet build apk --verbose
         
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-V49-STABLE
+          name: PETROVET-STABLE-APK
           path: build/apk/**/*.apk
