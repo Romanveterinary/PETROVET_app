@@ -3,40 +3,46 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - uses: subosito/flutter-action@v2
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Force Accept Licenses
-        # Вирішує проблему зависання на кроці ліцензій
+      - name: Manual License Injection
+        # Цей блок ми залишаємо, бо він допомагає проскочити запити ліцензій
         run: |
-          yes | flutter doctor --android-licenses || true
           mkdir -p ${ANDROID_HOME}/licenses
-          echo -e "\n8933bad161affd0fb5b1744237198a28906322b2" > ${ANDROID_HOME}/licenses/android-sdk-license
+          echo -e "8933bad161affd0fb5b1744237198a28906322b2\nd56239c038234515b191295b28d3e21e64e9a86a\n97065fd90437c144962453629e47854617e96b8c" > ${ANDROID_HOME}/licenses/android-sdk-license
+          echo -e "84831b9409646a918e30573bab4c9c91346d8abd\n50466752757b0c35357f747d8b483ae28c943f09" > ${ANDROID_HOME}/licenses/android-sdk-preview-license
 
       - name: Install Dependencies
         run: |
           pip install flet==0.28.3
-          echo "flet==0.28.3" > requirements.txt
-          echo "google-generativeai" >> requirements.txt
-          echo "Pillow" >> requirements.txt
+          pip install google-generativeai Pillow
 
-      - name: Build APK
+      - name: Build APK (Fix Unicode Error)
+        # ОСЬ ТУТ МИ ЛІКУЄМО ПОМИЛКУ 'unicode is not defined'
         env:
-          PYTHONWARNINGS: "ignore" # Фікс для помилки 'unicode'
+          PYTHONIOENCODING: "utf-8"
+          LANG: "C.UTF-8"
           TERM: "dumb"
-        run: flet build apk
+          NO_COLOR: "1"
+        run: flet build apk --verbose
         
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PETROVET-STABLE-APK
+          name: PETROVET-MARKET-STABLE
           path: build/apk/**/*.apk
